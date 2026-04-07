@@ -1,7 +1,7 @@
 version: "1.0.0"
 name: "GreenAI-Scheduler"
 description: "AI agent optimizes GPU workloads for low carbon impact."
-entrypoint: "server.app:app"
+entrypoint: "server.app:main"
 tasks:
   - id: "easy"
     goal: "Finish 1 NLP job in 10 steps"
