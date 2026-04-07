@@ -1,0 +1,11 @@
+version: "1.0.0"
+name: "GreenAI-Scheduler"
+description: "AI agent optimizes GPU workloads for low carbon impact."
+entrypoint: "main:app"
+tasks:
+  - id: "easy"
+    goal: "Finish 1 NLP job in 10 steps"
+  - id: "medium"
+    goal: "Balance 2 jobs before deadline"
+  - id: "hard"
+    goal: "Balance 3 compute-heavy jobs in a highly volatile grid before step 10"
