@@ -77,3 +77,11 @@ def step(action: Action):
     state, reward, done = env.step(action)
     info = {"status": "ok"}
     return [state, reward, done, info]
+import uvicorn
+
+def main():
+    """Entry point for the OpenEnv validator."""
+    uvicorn.run(app, host="0.0.0.0", port=7860)
+
+if __name__ == "__main__":
+    main()
