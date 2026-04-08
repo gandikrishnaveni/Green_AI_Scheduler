@@ -1,0 +1,12 @@
+version = 1
+revision = 1
+
+[[package]]
+name = "greenai-scheduler"
+version = "1.0.0"
+source = { virtual = "." }
+
+[[package]]
+name = "openenv-core"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
