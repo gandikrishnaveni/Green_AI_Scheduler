@@ -1,4 +1,4 @@
-# 🌍 GreenAI-Scheduler: Carbon-Aware Reinforcement Learning Environment
+# GreenAI-Scheduler: Carbon-Aware Reinforcement Learning Environment
 
 ## 1. Environment Overview & Motivation
 As artificial intelligence models grow larger, their training and inference compute costs have a significant environmental impact. The GreenAI-Scheduler is a reinforcement learning environment built on the OpenEnv specification that simulates a real-world energy-aware task queue.
