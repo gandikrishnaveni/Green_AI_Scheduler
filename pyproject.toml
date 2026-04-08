@@ -4,18 +4,20 @@ build-backend = "hatchling.build"
 
 [project]
 name = "greenai-scheduler"
-version = "0.1.0"
+version = "1.0.0"
 description = "Carbon-aware RL environment"
 dependencies = [
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
-    "openenv-core>=0.2.0",
     "pydantic>=2.0.0",
-    "pyyaml>=6.0"
+    "pyyaml>=6.0",
+    "requests",
+    "openai"
 ]
 
 [project.scripts]
-server = "server.app:main"
+# This MUST match exactly what you put in openenv.yaml
+"server.app:main" = "server.app:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["."]
+packages = ["server"]
