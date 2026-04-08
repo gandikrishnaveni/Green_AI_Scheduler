@@ -5,7 +5,10 @@ entrypoint: "server.app:main"
 tasks:
   - id: "easy"
     goal: "Finish 1 NLP job in 10 steps"
+    grader: true
   - id: "medium"
     goal: "Balance 2 jobs before deadline"
+    grader: true
   - id: "hard"
     goal: "Balance 3 compute-heavy jobs in a highly volatile grid before step 10"
+    grader: true 
