@@ -1,11 +1,13 @@
 import os
 import random
+import uvicorn
 from typing import List, Dict, Optional
 from fastapi import FastAPI
 from pydantic import BaseModel
 
 app = FastAPI()
 
+# --- Models ---
 class State(BaseModel):
     current_step: int
     carbon_intensity: float
@@ -17,6 +19,12 @@ class Action(BaseModel):
     command: str
     job_id: Optional[str] = None
 
+class GradeRequest(BaseModel):
+    task: str
+    state: dict
+    reward_history: List[float]
+
+# --- Environment Logic ---
 class GreenAIEnv:
     def __init__(self):
         self.reset()
@@ -50,12 +58,14 @@ class GreenAIEnv:
             for job in self.jobs:
                 if job['id'] == action.job_id and job['duration'] > 0:
                     job['duration'] -= 1
-                    current_carbon = self.get_state()["carbon_intensity"]
-                    reward = 0.8 if current_carbon < 200 else 0.2
+                    current_intensity = self.get_state()["carbon_intensity"]
+                    # Rewarding greener runs
+                    reward = 0.8 if current_intensity < 200 else 0.2
         
         elif action.command == "wait":
-            current_carbon = self.get_state()["carbon_intensity"]
-            reward = 0.4 if current_carbon > 300 else 0.0
+            current_intensity = self.get_state()["carbon_intensity"]
+            # Rewarding waiting during high carbon peaks
+            reward = 0.4 if current_intensity > 300 else 0.1
 
         state = self.get_state()
         done = self.step_count >= 10 or not state["pending_jobs"]
@@ -64,6 +74,7 @@ class GreenAIEnv:
 
 env = GreenAIEnv()
 
+# --- API Endpoints ---
 @app.get("/")
 def home(): 
     return {"status": "GreenAI Environment Running"}
@@ -77,8 +88,29 @@ def step(action: Action):
     state, reward, done = env.step(action)
     info = {"status": "ok"}
     return [state, reward, done, info]
-import uvicorn
 
+@app.post("/grade")
+def grade(request: GradeRequest):
+    """
+    Phase 2 Scorer: 
+    Meta requires score strictly between 0 and 1.
+    """
+    if not request.reward_history:
+        return {"score": 0.01}
+    
+    # Calculate performance based on total rewards accumulated
+    total_reward = sum(request.reward_history)
+    max_possible = 8.0 # Rough estimate for 10 steps
+    
+    # Normalize score
+    raw_score = total_reward / max_possible
+    
+    # CRITICAL: Clamp score between 0.01 and 0.99 (Never exactly 0 or 1)
+    final_score = max(0.01, min(0.99, raw_score))
+    
+    return {"score": round(final_score, 2)}
+
+# --- Entry Point ---
 def main():
     """Entry point for the OpenEnv validator."""
     uvicorn.run(app, host="0.0.0.0", port=7860)
