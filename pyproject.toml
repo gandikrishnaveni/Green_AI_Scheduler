@@ -12,12 +12,12 @@ dependencies = [
     "pydantic>=2.0.0",
     "pyyaml>=6.0",
     "requests",
-    "openai"
+    "openai",
+    "openenv-core>=0.2.0"
 ]
 
 [project.scripts]
-# This MUST match exactly what you put in openenv.yaml
-"server.app:main" = "server.app:main"
+server = "server.app:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["server"]
