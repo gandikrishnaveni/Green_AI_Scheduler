@@ -19,9 +19,10 @@ class Action(BaseModel):
     command: str
     job_id: Optional[str] = None
 
+# UPDATED: More flexible model to prevent 422 errors
 class GradeRequest(BaseModel):
     task: str
-    state: dict
+    state: Optional[Dict] = None 
     reward_history: List[float]
 
 # --- Environment Logic ---
@@ -93,22 +94,22 @@ def step(action: Action):
 def grade(request: GradeRequest):
     """
     Phase 2 Scorer: 
-    Meta requires score strictly between 0 and 1.
+    STRICTLY ensures score is between 0.01 and 0.99.
     """
-    if not request.reward_history:
-        return {"score": 0.01}
+    # Safety check for empty history
+    if not request.reward_history or len(request.reward_history) == 0:
+        return {"score": 0.05}
     
-    # Calculate performance based on total rewards accumulated
     total_reward = sum(request.reward_history)
-    max_possible = 8.0 # Rough estimate for 10 steps
+    # We use a slightly larger divisor to ensure we don't hit 1.0 easily
+    divisor = max(len(request.reward_history) * 0.8, 1.0)
     
-    # Normalize score
-    raw_score = total_reward / max_possible
+    raw_score = total_reward / divisor
     
-    # CRITICAL: Clamp score between 0.01 and 0.99 (Never exactly 0 or 1)
+    # CRITICAL: Clamp score strictly between 0.01 and 0.99
     final_score = max(0.01, min(0.99, raw_score))
     
-    return {"score": round(final_score, 2)}
+    return {"score": round(float(final_score), 2)}
 
 # --- Entry Point ---
 def main():
