@@ -3,92 +3,73 @@ import json
 import requests
 from openai import OpenAI
 
-# 1. Environment Configuration
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+# 1. Initialize the client using the Meta/Scaler Proxy variables
+# The validator "injects" these into the environment during the run.
+client = OpenAI(
+    base_url=os.environ.get("API_BASE_URL", "https://api.openai.com/v1"),
+    api_key=os.environ.get("API_KEY", "dummy-key-for-local-testing")
+)
 
-# FIX: Manually provide token or handle empty state for local testing
-HF_TOKEN = os.getenv("HF_TOKEN", "your_token_here") 
-
-# FIX: Replace with your actual Hugging Face Space URL
-ENV_URL = os.getenv("ENV_URL", "https://krishnavenigandi123-green-ai-scheduler.hf.space")
-
-# Initialize Client
-client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
+# Your environment URL (Hugging Face Space)
+BASE_URL = os.environ.get("ENV_URL", "http://localhost:7860")
 
 def get_llm_action(state):
-    prompt = f"""
-    You are an RL Agent in a Carbon-Aware Scheduler.
-    State Vector: {state_vector} 
-    (Indices: 0:Step, 1:Carbon, 2:Trend, 3:JobsLeft, 4:Urgency, 5:TotalCarbon, 6:Completion)
-    
-    Action Space:
-    0: Wait
-    1: Run Job 0
-    2: Run Job 1 (if exists)
-    
-    Goal: Maximize completion while CI (Index 1) is low.
-    Respond ONLY JSON: {{"action": int}}
     """
+    Formulates a prompt for the LLM based on the current environment state
+    and returns the structured JSON action.
+    """
+    prompt = f"""
+    You are a Green-AI Grid Architect. Your goal is to complete computational jobs 
+    while minimizing carbon footprint.
     
+    Current Environment State:
+    {json.dumps(state, indent=2)}
+    
+    Strategic Constraints:
+    1. If carbon_intensity is HIGH (>400) and jobs have slack (deadline - step > 2), you should WAIT.
+    2. If carbon_intensity is LOW (<250), RUN the job with the shortest duration.
+    3. If a job's deadline is approaching (deadline - step <= 1), RUN it regardless of carbon cost.
+    
+    Respond ONLY with a valid JSON object:
+    {{"command": "run_job", "job_id": "string"}} or {{"command": "wait", "job_id": null}}
+    """
+
     try:
         response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[{"role": "system", "content": "You are a green energy scheduler."},
-                      {"role": "user", "content": prompt}],
-            temperature=0.0
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a precise scheduling assistant. Output only JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={ "type": "json_object" }
         )
-        # Strip code blocks if LLM adds them
-        content = response.choices[0].message.content.strip()
-        if content.startswith("```"):
-            content = content.split("```")[1].replace("json", "").strip()
-        return json.loads(content)
-    except:
-        return {"command": "wait"}
-
-def run_task(task_id):
-    # [START] tag - Required
-    print(f"[START] task={task_id} env=GreenAI-v1 model={MODEL_NAME}")
-    
-    step_idx = 0
-    total_rewards = []
-    success = "false"
-    last_error = "null"
-    
-    try:
-        # Reset the environment
-        reset_req = requests.post(f"{ENV_URL}/reset?task={task_id}")
-        state = reset_req.json()
-        
-        done = False
-        while not done and step_idx < 10:
-            step_idx += 1
-            
-            action = get_llm_action(state)
-            
-            # Step the environment
-            step_req = requests.post(f"{ENV_URL}/step", json=action)
-            res_data = step_req.json()
-            
-            state, reward, done = res_data[0], res_data[1], res_data[2]
-            total_rewards.append(f"{reward:.2f}")
-            
-            # [STEP] tag - Required
-            action_str = f"{action['command']}({action.get('job_id', '')})"
-            print(f"[STEP] step={step_idx} action={action_str} reward={reward:.2f} done={str(done).lower()} error={last_error}")
-            
-        success = "true" if state['pending_jobs'] == [] else "false"
-            
+        return json.loads(response.choices[0].message.content)
     except Exception as e:
-        last_error = str(e)
-        print(f"DEBUG Error: {last_error}")
+        print(f"Error calling LLM Proxy: {e}")
+        return {"command": "wait", "job_id": None}
 
-    # FIX: Ensure final_score is strictly between 0 and 1 (e.g., 0.95 or 0.05)
-    final_score = 0.95 if success == "true" else 0.05
+def run_evaluation(task="medium"):
+    """Runs a full episode and reports the final score."""
+    print(f"🚀 Starting Evaluation for Task: {task}")
     
-    # [END] tag - Required
-    print(f"[END] success={success} steps={step_idx} score={final_score:.2f} rewards={','.join(total_rewards)}")
+    # Reset Environment
+    reset_resp = requests.post(f"{BASE_URL}/reset?task={task}")
+    state = reset_resp.json()
+    
+    done = False
+    while not done:
+        # Get Action from LLM
+        action = get_llm_action(state)
+        
+        # Step Environment
+        step_resp = requests.post(f"{BASE_URL}/step", json=action)
+        state, reward, done, info = step_resp.json()
+        
+        print(f"Step: {state['step']} | Carbon: {state['carbon_intensity']} | Action: {action['command']}")
+
+    # Final Grade
+    grade_resp = requests.post(f"{BASE_URL}/grade")
+    print(f"\n✅ Evaluation Complete! Final Score: {grade_resp.json()['score']}")
 
 if __name__ == "__main__":
-    target_task = os.getenv("TASK_NAME", "easy")
-    run_task(target_task)
+    run_evaluation()
