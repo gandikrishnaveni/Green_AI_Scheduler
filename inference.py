@@ -12,11 +12,9 @@ client = OpenAI(
 BASE_URL = os.environ.get("ENV_URL", "http://localhost:7860")
 
 def get_llm_action(state):
-    """Calls LLM with a strict 10-second timeout."""
-    prompt = f"State: {json.dumps(state)}. Respond with JSON: {{'command': 'run_job', 'job_id': '...'}} or {{'command': 'wait'}}"
-
+    """Calls LLM with strict JSON output."""
+    prompt = f"Current State: {json.dumps(state)}. Respond with JSON: {{'command': 'run_job', 'job_id': '...'}} or {{'command': 'wait'}}"
     try:
-        # TIMEOUT ADDED HERE
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
@@ -24,29 +22,27 @@ def get_llm_action(state):
             timeout=10.0 
         )
         return json.loads(response.choices[0].message.content)
-    except Exception as e:
-        print(f"LLM Timeout or Error: {e}")
+    except:
         return {"command": "wait", "job_id": None}
 
 def run_evaluation(task="medium"):
-    print(f"🚀 Starting Fast Evaluation: {task}")
+    # MANDATORY START TAG
+    print(f"[START] task={task}", flush=True)
     
     try:
-        # TIMEOUT ADDED TO REQUESTS
         reset_resp = requests.post(f"{BASE_URL}/reset?task={task}", timeout=5)
         state = reset_resp.json()
     except: return
 
     done = False
-    max_steps = 50  # HARD SAFETY LIMIT to prevent infinite loops
     step_count = 0
+    total_reward = 0
 
-    while not done and step_count < max_steps:
+    while not done and step_count < 50:
         step_count += 1
         action = get_llm_action(state)
         
         try:
-            # TIMEOUT ADDED TO STEP
             step_resp = requests.post(f"{BASE_URL}/step", json=action, timeout=5)
             response_data = step_resp.json()
 
@@ -54,16 +50,26 @@ def run_evaluation(task="medium"):
                 state, reward, done = response_data[0], response_data[1], response_data[2]
             else:
                 state = response_data
+                reward = 0
                 done = state.get("step", 0) >= 10
+            
+            total_reward += reward
+            # MANDATORY STEP TAG
+            print(f"[STEP] step={step_count} reward={reward}", flush=True)
+            
         except:
             break
 
     # Final Grade
+    score = 0
     try:
-        requests.post(f"{BASE_URL}/grade", timeout=5)
+        grade_resp = requests.post(f"{BASE_URL}/grade", timeout=5)
+        score = grade_resp.json().get('score', 0)
     except:
         pass
-    print("✅ Evaluation finished within time limits.")
+    
+    # MANDATORY END TAG
+    print(f"[END] task={task} score={score} steps={step_count}", flush=True)
 
 if __name__ == "__main__":
     run_evaluation()
